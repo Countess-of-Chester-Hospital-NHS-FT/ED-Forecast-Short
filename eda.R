@@ -22,7 +22,7 @@ data <- ecds_data |>
          month_number = month(check_in_date_time),
          month_name = month(check_in_date_time, label = TRUE, abbr = FALSE),
          weekday_number = wday(check_in_date_time, week_start = 1), # Sunday = 1, Monday = 2, etc.
-         weekday_name = wday(check_in_date_time, label = TRUE, abbr = FALSE, week_start = 1),
+         weekday_name = wday(check_in_date_time, label = TRUE, abbr = TRUE, week_start = 1),
          year = year(check_in_date_time)
          ) |>
   filter(check_in_week > ymd("2017-04-02"),
@@ -155,3 +155,127 @@ other_years_df |>
        y = "Attendances") +
   theme(legend.title = element_blank())
 
+
+#### Weekly seasonality by year
+
+weekly_plot_df <- data_nocovid |>
+  count(check_in_date, weekday_number, weekday_name, year) |>
+  arrange(check_in_date) |>
+  group_by(year, weekday_number, weekday_name) |>
+  summarise(mean = mean(n)) |>
+  ungroup()
+
+weekday_average <- weekly_plot_df %>%
+  group_by(weekday_number) %>%
+  summarize(avg_n = mean(mean, na.rm = T))
+
+labels_df <- weekly_plot_df |>
+  distinct(weekday_number, weekday_name) |>
+  arrange(weekday_number)
+
+weekly_plot_df |>
+  ggplot(aes(x = weekday_number, y = mean, color = as_factor(year))) +
+  geom_rect(xmin = 5.5, xmax = 7.25, ymin = -Inf, ymax = Inf,
+            fill = "lightyellow1", alpha = 0.045, inherit.aes = FALSE) +
+  geom_line() +
+  geom_point() +
+  geom_line(data = weekday_average, aes(x = weekday_number, y = avg_n),
+            color = "black", size = 1.2, linetype = "solid") +
+  scale_x_continuous(breaks = labels_df$weekday_number,
+                     labels = labels_df$weekday_name) +
+  labs(title = "Weekly seasonality by year",
+       x = NULL,
+       y = "Mean Attendances") +
+  theme(legend.title = element_blank())
+
+#### Weekly seasonality by month
+
+weekly_plot_df <- data_nocovid |>
+  count(check_in_date, weekday_number, weekday_name, month_number, month_name) |>
+  arrange(check_in_date) |>
+  group_by(month_number, month_name, weekday_number, weekday_name) |>
+  summarise(mean = mean(n)) |>
+  ungroup()
+
+weekday_average <- weekly_plot_df %>%
+  group_by(weekday_number) %>%
+  summarize(avg_n = mean(mean, na.rm = T))
+
+labels_df <- weekly_plot_df |>
+  distinct(weekday_number, weekday_name) |>
+  arrange(weekday_number)
+
+weekly_plot_df |>
+  ggplot(aes(x = weekday_number, y = mean, color = month_name)) +
+  geom_rect(xmin = 5.5, xmax = 7.25, ymin = -Inf, ymax = Inf,
+            fill = "lightyellow1", alpha = 0.045, inherit.aes = FALSE) +
+  geom_line() +
+  geom_point() +
+  geom_line(data = weekday_average, aes(x = weekday_number, y = avg_n),
+            color = "black", size = 1.2, linetype = "solid") +
+  scale_x_continuous(breaks = labels_df$weekday_number,
+                     labels = labels_df$weekday_name) +
+  labs(title = "Weekly seasonality by month",
+       x = NULL,
+       y = "Mean Attendances") +
+  theme(legend.title = element_blank())
+
+#### Daily seasonality
+
+daily_plot_df <- data_nocovid |>
+  count(check_in_date, check_in_hour, year) |>
+  arrange(check_in_date) |>
+  group_by(year, check_in_hour) |>
+  summarise(mean = mean(n)) |>
+  ungroup()
+
+# test <- daily_plot_df |>
+#   group_by(year) |>
+#   summarise(n = sum(mean))
+
+daily_average <- daily_plot_df %>%
+  group_by(check_in_hour) %>%
+  summarize(avg_n = mean(mean, na.rm = T))
+
+daily_plot_df |>
+  ggplot(aes(x = check_in_hour, y = mean, color = as_factor(year))) +
+  geom_rect(xmin = 9, xmax = 17, ymin = -Inf, ymax = Inf,
+            fill = "lightyellow1", alpha = 0.045, inherit.aes = FALSE) +
+  geom_line() +
+  geom_point() +
+  geom_line(data = daily_average, aes(x = check_in_hour, y = avg_n),
+            color = "black", size = 1.2, linetype = "solid") +
+  labs(title = "Daily seasonality by year",
+       subtitle = "Working day (9-5) shown in yellow",
+       x = NULL,
+       y = "Mean Attendances") +
+  theme(legend.title = element_blank())
+
+### Daily seasonality by weekday
+
+daily_plot_df <- data_nocovid |>
+  count(check_in_date, check_in_hour, weekday_name) |>
+  arrange(check_in_date) |>
+  group_by(weekday_name, check_in_hour) |>
+  summarise(mean = mean(n)) |>
+  ungroup()
+
+# test <- daily_plot_df |>
+#   group_by(year) |>
+#   summarise(n = sum(mean))
+
+daily_average <- daily_plot_df %>%
+  group_by(check_in_hour) %>%
+  summarize(avg_n = mean(mean, na.rm = T))
+
+daily_plot_df |>
+  ggplot(aes(x = check_in_hour, y = mean, color = weekday_name)) +
+  geom_line() +
+  geom_point() +
+  geom_line(data = daily_average, aes(x = check_in_hour, y = avg_n),
+            color = "black", size = 1.2, linetype = "solid") +
+  labs(title = "Daily seasonality by weekday",
+       x = NULL,
+       y = "Mean Attendances") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(legend.title = element_blank())
