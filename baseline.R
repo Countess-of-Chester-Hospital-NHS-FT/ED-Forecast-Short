@@ -27,7 +27,8 @@ data <- ecds_data |>
   ) |>
   filter(check_in_date >= ymd("2022-11-01"))
 
-saveRDS(data, "data.RDS")
+#saveRDS(data, "data.RDS")
+data <- readRDS("data.RDS") #for offline
 
 missing_data <- missing_glimpse(data)
 
