@@ -28,6 +28,12 @@ data <- ecds_data |>
   filter(check_in_week > ymd("2017-04-02"),
          check_in_week < floor_date(now(), "week", week_start = 1))
 
+test <- data |>
+  distinct(check_in_date, iso_week_number, iso_year) |>
+  group_by(iso_week_number, iso_year) |>
+  count() |>
+  filter(n != 7)
+
 missing_data <- missing_glimpse(data)
 
 ### Global variables
@@ -83,8 +89,16 @@ average_week_df <- other_years_df %>%
   group_by(iso_week_number) %>%
   summarize(avg_n = mean(n), .groups = 'drop')
 
-bst_start <- 12.5
-bst_end <- 43.5
+bst_start <- 12
+bst_end <- 43
+
+season_split_df <- other_years_df |>
+  mutate(summer = if_else(between(iso_week_number, bst_start, bst_end), TRUE, FALSE)) |>
+  group_by(summer) |>
+  summarise(mean_n = mean(n, na.rm = TRUE))
+
+summer_mean <- season_split_df |> filter(summer) |> pull(mean_n)
+winter_mean <- season_split_df |> filter(!summer) |> pull(mean_n)
 
 meteo_spring <- 9-22
 meteo_summer <- 23-35
@@ -105,7 +119,7 @@ xmas_hols_end <- 1.5
 other_years_df |>
   ggplot(aes(x = iso_week_number, y = n, color = as_factor(iso_year))) +
   geom_rect(xmin = bst_start, xmax = bst_end, ymin = -Inf, ymax = Inf,
-            fill = "lightyellow1", alpha = 0.04, inherit.aes = FALSE) +
+            fill = "lightyellow1", alpha = 0.045, inherit.aes = FALSE) +
   geom_rect(xmin = summer_hols_start, xmax = summer_hols_end, ymin = -Inf, ymax = Inf,
             fill = "gold1", alpha = 0.002, inherit.aes = FALSE) +
   geom_rect(xmin = easter_hols_start, xmax = easter_hols_end, ymin = -Inf, ymax = Inf,
@@ -127,6 +141,14 @@ other_years_df |>
   geom_point(data = y2025_df, aes(x = iso_week_number, y = n, color = as_factor(iso_year)), size = 1.5) +
   geom_line(data = average_week_df, aes(x = iso_week_number, y = avg_n),
             color = "black", size = 1.2, linetype = "solid") +
+  annotate("label",
+           x = 25,
+           y = 1900,
+           label = paste("Summer:", round(summer_mean))) +
+  annotate("label",
+           x = 5,
+           y = 1900,
+           label = paste("Winter:", round(winter_mean))) +
   labs(title = "ED Attendances by Week of the Year",
        subtitle = "Yellow shading indicates BST and approx. school holidays",
        x = "Week Number (ISO 8601)",
