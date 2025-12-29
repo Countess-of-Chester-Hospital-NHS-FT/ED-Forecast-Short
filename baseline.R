@@ -12,6 +12,9 @@ theme_set(theme_bw())
 db <- DBI::dbConnect(odbc::odbc(), "coch_p2")
 ecds_data <-  DBI::dbGetQuery(db, "select * from InformationSandpitDB.Reports.pbi_ED")
 
+saveRDS(ecds_data, "ecds_data.RDS")
+ecds_data <- readRDS("ecds_data.RDS")
+
 ### data prep
 data <- ecds_data |>
   clean_names() |>
@@ -27,11 +30,11 @@ data <- ecds_data |>
          weekday_number = wday(check_in_date_time, week_start = 1), # Sunday = 1, Monday = 2, etc.
          weekday_name = wday(check_in_date_time, label = TRUE, abbr = TRUE, week_start = 1),
          year = year(check_in_date_time)
-  ) |>
-  filter(check_in_date >= ymd("2022-11-01"))
+  ) #|>
+  #filter(check_in_date >= ymd("2022-11-01"))
 
-#saveRDS(data, "data.RDS")
-data <- readRDS("data.RDS") #for offline
+saveRDS(data, "data.RDS")
+#data <- readRDS("data.RDS") #for offline
 
 missing_data <- missing_glimpse(data)
 
@@ -55,8 +58,10 @@ plot_df <- data |>
     p_error = abs_diff/n
   )|>
   rename(actual_values = n) |>
-  ungroup() |>
-  filter(check_in_date >= ymd("2024-10-30"))
+  ungroup() #|>
+  #filter(check_in_date >= ymd("2023-01-01"))
+
+saveRDS(plot_df, "plot_df.RDS")
 
 # df for plotting actual and baseline forecast on same chart
 plot_df2 <- plot_df |>
