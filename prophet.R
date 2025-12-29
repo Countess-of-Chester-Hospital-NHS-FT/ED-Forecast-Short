@@ -11,6 +11,24 @@ pandemic_start <- ymd("2020-01-01")
 pandemic_end <- ymd("2023-01-01")
 pandemic <- pandemic_start%--%pandemic_end
 
+#holidays
+db <- DBI::dbConnect(odbc::odbc(), "coch_p2")
+holidays <-  DBI::dbGetQuery(db,
+                        "select
+                        	Date_Skey
+                        	,UKHolidayName
+                        from [CCDW].[dim].[Date]
+                        where Date_Skey > '20170101'
+                        and IsUKHoliday = 1") |>
+  clean_names()
+
+holidays <- holidays |>
+  rename(ds = date_skey,
+         holiday = uk_holiday_name) |>
+  mutate(ds = ymd(ds),
+         lower_window = -1,
+         upper_window = 1)
+
 # remove pandemic period
 data_no_pandemic <- data |>
   mutate(actual_values = if_else(check_in_date %within% pandemic, NA, actual_values))
@@ -30,6 +48,7 @@ df <- data.frame(
 )
 
 m <- prophet(df)
+#m <- prophet(df, holidays = holidays)
 
 future <- make_future_dataframe(m, periods = 7)
 
