@@ -11,7 +11,7 @@ pandemic_start <- ymd("2020-01-01")
 pandemic_end <- ymd("2023-01-01")
 pandemic <- pandemic_start%--%pandemic_end
 
-date_seq <- seq(ymd("2024-12-30"), ymd("2025-12-29"), by = "day")
+date_seq <- seq(ymd("2024-12-20"), ymd("2025-12-29"), by = "day")
 
 #holidays
 db <- DBI::dbConnect(odbc::odbc(), "coch_p2")
@@ -114,10 +114,37 @@ for (i in 1:7) {
   performance_df <- add_row(performance_df, days_ahead = i, mae = mae, mape = mape)
 }
 
+############ Compare diffs for baseline and prophet ###########################
 saveRDS(results_df, "results_df.RDS")
+results_df <- readRDS("results_df.RDS")
+
+results_df <- results_df |>
+  filter(days_ahead == 2) |>
+  filter(ds %within% (ymd("2024-12-20")%--%ymd("2025-12-19"))) |>
+  mutate(
+    diff = predicted - actual,
+    abs_diff = abs(diff),
+    p_error = abs_diff/actual,
+    model = "prophet"
+  ) |>
+  select(diff, model)
 
 
+plot_df <- readRDS("plot_df.RDS") |>
+  filter(check_in_date %within% (ymd("2024-12-20")%--%ymd("2025-12-19"))) |>
+  mutate(model = "baseline") |>
+  select(diff, model) |>
+  bind_rows(results_df)
 
+
+plot_df |>
+  ggplot(aes(x = diff)) +
+  geom_histogram(color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~model, ncol = 1) +
+  labs(x = "Difference between Prediction and Actual",
+       y = "Count",
+       title = "Error Distributions")
 
 # Calculate accuracy
 #mae <- mean(abs(comparison$actual - comparison$predicted))

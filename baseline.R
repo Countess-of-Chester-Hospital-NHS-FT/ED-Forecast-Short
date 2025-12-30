@@ -12,7 +12,7 @@ theme_set(theme_bw())
 db <- DBI::dbConnect(odbc::odbc(), "coch_p2")
 ecds_data <-  DBI::dbGetQuery(db, "select * from InformationSandpitDB.Reports.pbi_ED")
 
-saveRDS(ecds_data, "ecds_data.RDS")
+#saveRDS(ecds_data, "ecds_data.RDS")
 ecds_data <- readRDS("ecds_data.RDS")
 
 ### data prep
@@ -31,9 +31,9 @@ data <- ecds_data |>
          weekday_name = wday(check_in_date_time, label = TRUE, abbr = TRUE, week_start = 1),
          year = year(check_in_date_time)
   ) #|>
-  #filter(check_in_date >= ymd("2022-11-01"))
+  #filter(check_in_date >= ymd("2022-12-30"))
 
-saveRDS(data, "data.RDS")
+#saveRDS(data, "data.RDS")
 #data <- readRDS("data.RDS") #for offline
 
 missing_data <- missing_glimpse(data)
@@ -59,7 +59,7 @@ plot_df <- data |>
   )|>
   rename(actual_values = n) |>
   ungroup() #|>
-  #filter(check_in_date >= ymd("2023-01-01"))
+  #filter(check_in_date >= ymd("2024-12-20"))
 
 saveRDS(plot_df, "plot_df.RDS")
 
