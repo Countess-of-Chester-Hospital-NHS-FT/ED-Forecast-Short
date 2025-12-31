@@ -22,6 +22,7 @@
 *.svg
 *.RDS
 *.rds
+*.txt
 
 # Exclude output file types
 *.html
