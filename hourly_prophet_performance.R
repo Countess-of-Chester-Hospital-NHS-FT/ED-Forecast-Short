@@ -10,7 +10,7 @@ library(prophet)
 theme_set(theme_bw())
 
 ### globals
-performance_period_start = ymd("2024-12-20")
+performance_period_start = ymd("2025-12-06")
 performance_period_end = ymd("2025-12-20")
 performance_period = performance_period_start%--%performance_period_end
 
@@ -153,9 +153,34 @@ data_no_pandemic <- data_actuals2 |>
 
 ## prophet loop
 
-date_seq <- seq((performance_period_start - days(2)), today() - days(7), by = "day")
-
+date_seq <- seq(performance_period_start - days(2), today() - days(7), by = "day")
 results_df <- tibble()
+
+m <- prophet(holidays = holidays, 
+             daily.seasonality = FALSE, 
+             weekly.seasonality = TRUE) # yearly is auto true if > 2 years of data
+
+# Add custom hourly seasonality for each specific day
+m <- add_seasonality(m, name='hourly_mon', period=1, fourier.order=4, condition.name='is_mon')
+m <- add_seasonality(m, name='hourly_tue', period=1, fourier.order=4, condition.name='is_tue')
+m <- add_seasonality(m, name='hourly_wed', period=1, fourier.order=4, condition.name='is_wed')
+m <- add_seasonality(m, name='hourly_thu', period=1, fourier.order=4, condition.name='is_thu')
+m <- add_seasonality(m, name='hourly_fri', period=1, fourier.order=4, condition.name='is_fri')
+m <- add_seasonality(m, name='hourly_sat', period=1, fourier.order=4, condition.name='is_sat')
+m <- add_seasonality(m, name='hourly_sun', period=1, fourier.order=4, condition.name='is_sun')
+
+add_day_indicators <- function(df) {
+  df %>%
+    mutate(
+      is_mon = as.numeric(wday(ds) == 2),
+      is_tue = as.numeric(wday(ds) == 3),
+      is_wed = as.numeric(wday(ds) == 4),
+      is_thu = as.numeric(wday(ds) == 5),
+      is_fri = as.numeric(wday(ds) == 6),
+      is_sat = as.numeric(wday(ds) == 7),
+      is_sun = as.numeric(wday(ds) == 1)
+    )
+}
 
 for (i in seq_along(date_seq)) {
   current_date <- date_seq[i]
@@ -175,11 +200,13 @@ for (i in seq_along(date_seq)) {
     ds = data_train$check_in_hour_dt,
     y = data_train$sum_walk
   )
+  df_walk <- add_day_indicators(df_walk)
   
-  m <- prophet(df_walk, holidays = holidays, daily.seasonality = TRUE)
+  m_walk <- fit.prophet(m, df_walk)
   
-  future_walk <- make_future_dataframe(m, periods = 168, freq = 'hour', include_history = FALSE)
-  forecast_walk <- predict(m, future_walk)
+  future_walk <- make_future_dataframe(m_walk, periods = 168, freq = 'hour', include_history = FALSE)
+  future_walk <- add_day_indicators(future_walk)
+  forecast_walk <- predict(m_walk, future_walk)
   test_actual <- head(data_test, 168)
   
   print("Predicting ambulances...")
@@ -189,10 +216,12 @@ for (i in seq_along(date_seq)) {
     ds = data_train$check_in_hour_dt,
     y = data_train$sum_amb
   )
+  df_amb <- add_day_indicators(df_amb)
   
-  m_amb <- prophet(df_amb, holidays = holidays, daily.seasonality = TRUE)
+  m_amb <- fit.prophet(m, df_amb)
   
   future_amb <- make_future_dataframe(m_amb, periods = 168, freq = 'hour', include_history = FALSE)
+  future_amb <- add_day_indicators(future_amb)
   forecast_amb <- predict(m_amb, future_amb)
   ####
   
@@ -284,6 +313,48 @@ daily_hist_df |>
   labs(x = "Difference between Prediction and Actual",
        y = "Count",
        title = "Error Distributions")
+
+## Linechart
+daily_line_df0 <- baseline_daily |>
+  rename(date = `as_date(check_in_hour_dt)`) |>
+  select(date, daily_baseline) |>
+  rename(value = daily_baseline) |>
+  mutate(model = "baseline")
+
+daily_line_df1 <- baseline_daily |>
+  rename(date = `as_date(check_in_hour_dt)`) |>
+  select(date, daily_actual) |>
+  rename(value = daily_actual) |>
+  mutate(model = "actual")
+
+daily_line_df <- prophet_daily |>
+  rename(date = `as_date(ds)`) |>
+  select(date, daily_prophet) |>
+  rename(value = daily_prophet) |>
+  mutate(model = "prophet") |>
+  bind_rows(daily_line_df0, daily_line_df1)
+
+library(plotly)
+
+p <- daily_line_df |>
+  ggplot(aes(x = date, y = value, color = model)) +
+  geom_line(aes(linewidth = model == "actual")) +
+  geom_point(aes(size = model == "actual")) +
+  scale_linewidth_manual(values = c("TRUE" = 1.0, "FALSE" = 0.5), guide = "none") +
+  scale_size_manual(
+    values = c("TRUE" = 1.8, "FALSE" = 1.2), 
+    guide = "none"
+  ) +
+  labs(x = NULL,
+       y = "Value",
+       title = "Predictions vs actuals")
+
+ggplotly(p) |> 
+  layout(
+    # This creates the "box" look of theme_bw()
+    xaxis = list(mirror = TRUE, linecolor = "black", showline = TRUE),
+    yaxis = list(mirror = TRUE, linecolor = "black", showline = TRUE)
+  )
 
 ## wape for baseline
 baseline_wape <- data_baseline |>
