@@ -153,7 +153,7 @@ data_no_pandemic <- data_actuals2 |>
 
 ## prophet loop
 
-date_seq <- seq((performance_period_start - days(2)), today(), by = "day")
+date_seq <- seq((performance_period_start - days(2)), today() - days(7), by = "day")
 
 results_df <- tibble()
 
@@ -264,6 +264,27 @@ prophet_performance <- prophet_daily |>
     mape = mean(p_error)
   )
 
+## Diff histogram daily level
+daily_hist_df0 <- baseline_daily |>
+  rename(date = `as_date(check_in_hour_dt)`) |>
+  select(date, diff) |>
+  mutate(model = "baseline")
+
+daily_hist_df <- prophet_daily |>
+  rename(date = `as_date(ds)`) |>
+  select(date, diff) |>
+  mutate(model = "prophet") |>
+  bind_rows(daily_hist_df0)
+
+daily_hist_df |>
+  ggplot(aes(x = diff)) +
+  geom_histogram(color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~model, ncol = 1) +
+  labs(x = "Difference between Prediction and Actual",
+       y = "Count",
+       title = "Error Distributions")
+
 ## wape for baseline
 baseline_wape <- data_baseline |>
   mutate(
@@ -274,7 +295,9 @@ baseline_wape <- data_baseline |>
   mutate(
     diff = total_baseline - total_actual,
     abs_diff = abs(diff)
-  ) |>
+  ) 
+
+baseline_wape2 <- baseline_wape |>
   group_by(as_date(check_in_hour_dt)) |>
   summarise(
     sum_diff = sum(abs_diff),
@@ -297,7 +320,9 @@ prophet_wape <- results_df |>
   mutate(
     diff = total_prophet - total_actual,
     abs_diff = abs(diff)
-  ) |>
+  ) 
+
+prophet_wape2 <- prophet_wape |>
   group_by(as_date(ds)) |>
   summarise(
     sum_diff = sum(abs_diff),
@@ -308,5 +333,26 @@ prophet_wape <- results_df |>
   summarise(
     overall_wape = mean(wape)
   )
+
+## Diff histogram hourly level
+hourly_hist_df0 <- baseline_wape |>
+  rename(datetime = check_in_hour_dt) |>
+  select(datetime, diff) |>
+  mutate(model = "baseline")
+
+hourly_hist_df <- prophet_wape |>
+  rename(datetime = ds) |>
+  select(datetime, diff) |>
+  mutate(model = "prophet") |>
+  bind_rows(hourly_hist_df0)
+
+hourly_hist_df |>
+  ggplot(aes(x = diff)) +
+  geom_histogram(color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  facet_wrap(~model, ncol = 1) +
+  labs(x = "Difference between Prediction and Actual",
+       y = "Count",
+       title = "Error Distributions")
   
   
