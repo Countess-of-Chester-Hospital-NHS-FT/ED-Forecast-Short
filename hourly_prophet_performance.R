@@ -6,6 +6,8 @@ library(slider)
 library(patchwork)
 library(scales)
 library(prophet)
+library(odbc)
+library(DBI)
 
 theme_set(theme_bw())
 

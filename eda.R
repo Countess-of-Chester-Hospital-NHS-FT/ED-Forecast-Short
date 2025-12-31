@@ -2,6 +2,8 @@ library(tidyverse)
 library(janitor)
 library(finalfit)
 library(zoo)
+library(odbc)
+library(DBI)
 
 theme_set(theme_bw())
 
