@@ -1,5 +1,7 @@
 Version: 1.0
 
+RVersion: 4.5.2
+
 RestoreWorkspace: Default
 SaveWorkspace: Default
 AlwaysSaveHistory: Default
