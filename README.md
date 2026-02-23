@@ -1,7 +1,7 @@
 # Short Term Forecasting of ED Attendances
 
 ### Status
-This project is currently work in progress
+This project is currently deployed and runs daily.
 
 ### About the project
 Increase accuracy of current forecast to help operational staff anticipate demand.
@@ -14,6 +14,5 @@ Under construction
 
 ### Built with
 
-Under construction
-
+See renv files
 
