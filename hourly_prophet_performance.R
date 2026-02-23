@@ -12,17 +12,13 @@ library(DBI)
 theme_set(theme_bw())
 
 ### globals
-performance_period_start = ymd("2025-12-06")
-performance_period_end = ymd("2025-12-20")
+performance_period_start = ymd("2025-01-15")
+performance_period_end = ymd("2026-01-14")
 performance_period = performance_period_start%--%performance_period_end
 
 ### data import
 db <- DBI::dbConnect(odbc::odbc(), "coch_p2")
 ecds_data <-  DBI::dbGetQuery(db, "select * from InformationSandpitDB.[datascience].[EDForecastShort_training]")
-
-
-#saveRDS(ecds_data, "ecds_data.RDS")
-#ecds_data <- readRDS("ecds_data.RDS")
 
 ### data prep
 data <- ecds_data |>
@@ -45,12 +41,11 @@ data <- ecds_data |>
   )
 
 missing_data <- missing_glimpse(data)
-#saveRDS(data, "data.RDS")
-#data <- readRDS("data.RDS") #for offline
 
 ## Make the time series - otherwise hours with 0 will be excluded
 min_dt <- min(data$check_in_hour_dt)
-max_dt <- max(data$check_in_hour_dt)
+max_dt <- max(data$check_in_hour_dt) #  this needs changing to make sure it goes to midnight
+# check ecds data is complete
 
 ## Actuals
 data_actuals <- data |>
@@ -98,6 +93,17 @@ data_baseline <- data_actuals2 |>
   select(-hour_of_day, -day_of_week) |>
   filter(check_in_hour_dt %within% performance_period,
          check_in_hour_dt < performance_period_end)
+
+saveRDS(data_baseline, "data_baseline_260123.RDS")
+
+################# NHSE Prediction
+nhse_df <- read_csv("nhse_tool.csv") |>
+  filter(scenario == "mean") |>
+  select(date, latest_value) |>
+  rename(nhse_prediction = latest_value) |>
+  mutate(nhse_prediction = round(nhse_prediction)) |>
+  filter(date %within% performance_period) |>
+  arrange(date)
 
 ################# Prophet prediction
 
@@ -246,6 +252,8 @@ results_df <- results_df |>
   filter(ds %within% performance_period,
          ds < performance_period_end)
 
+saveRDS(results_df, "results_df_260101.RDS")
+
 ######## Comparing performance daily level
 
 ## mae and mape at a daily level for baseline
@@ -269,6 +277,22 @@ baseline_performance <- baseline_daily |>
   summarise(
     mae = mean(abs_diff),
     mape = mean(p_error)
+  )
+
+## mae and mape for nhse
+nhse_df2 <- baseline_daily |>
+  rename(date = `as_date(check_in_hour_dt)`) |>
+  select(date, daily_actual) |>
+  left_join(nhse_df, join_by(date)) |>
+  mutate(diff = nhse_prediction - daily_actual,
+         abs_diff = abs(diff),
+         percent_error = abs_diff / daily_actual)
+
+
+nhse_df2_performance <- nhse_df2 |>
+  summarise(
+    mae = mean(abs_diff),
+    mape = mean(percent_error) *100
   )
 
 ## mae and mape at a daily level for prophet
@@ -301,11 +325,15 @@ daily_hist_df0 <- baseline_daily |>
   select(date, diff) |>
   mutate(model = "baseline")
 
+daily_hist_nhse <- nhse_df2 |>
+  select(date, diff) |>
+  mutate(model = "nhse")
+
 daily_hist_df <- prophet_daily |>
   rename(date = `as_date(ds)`) |>
   select(date, diff) |>
   mutate(model = "prophet") |>
-  bind_rows(daily_hist_df0)
+  bind_rows(daily_hist_df0, daily_hist_nhse)
 
 daily_hist_df |>
   ggplot(aes(x = diff)) +
@@ -329,16 +357,22 @@ daily_line_df1 <- baseline_daily |>
   rename(value = daily_actual) |>
   mutate(model = "actual")
 
+daily_line_df2 <- nhse_df |>
+  select(date, nhse_prediction) |>
+  rename(value = nhse_prediction) |>
+  mutate(model = "nhse")
+
 daily_line_df <- prophet_daily |>
   rename(date = `as_date(ds)`) |>
   select(date, daily_prophet) |>
   rename(value = daily_prophet) |>
   mutate(model = "prophet") |>
-  bind_rows(daily_line_df0, daily_line_df1)
+  bind_rows(daily_line_df0, daily_line_df1, daily_line_df2)
 
 library(plotly)
 
 p <- daily_line_df |>
+  filter(date > today() - 40) |>
   ggplot(aes(x = date, y = value, color = model)) +
   geom_line(aes(linewidth = model == "actual")) +
   geom_point(aes(size = model == "actual")) +
